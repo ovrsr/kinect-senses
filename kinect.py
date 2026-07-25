@@ -214,8 +214,11 @@ def set_led(state, index: int = 0) -> int:
 
 # --- depth denoise + visualization -----------------------------------------
 
-def get_depth_mm_denoised(index: int = 0, n: int = 5, registered: bool = True) -> np.ndarray:
-    """Median of n metric-depth frames (ignoring no-data) + small-hole fill."""
+def get_depth_mm_denoised(index: int = 0, n: int = 5, registered: bool = True,
+                          guide_rgb=None) -> np.ndarray:
+    """Median of n metric-depth frames (ignoring no-data) + hole fill. If
+    guide_rgb is given, uses the edge-aware (RGB-guided) fill; otherwise the
+    plain isotropic fill."""
     frames = []
     for _ in range(max(1, n)):
         frames.append(get_depth_mm(index, registered).astype(np.float32))
@@ -223,8 +226,10 @@ def get_depth_mm_denoised(index: int = 0, n: int = 5, registered: bool = True) -
     stack[stack == 0] = np.nan
     with np.errstate(all="ignore"):
         med = np.nanmedian(stack, axis=0)
-    med = np.nan_to_num(med, nan=0.0)
-    return _holefill(med.astype(np.uint16))
+    med = np.nan_to_num(med, nan=0.0).astype(np.uint16)
+    if guide_rgb is not None:
+        return holefill_guided(med, guide_rgb)
+    return _holefill(med)
 
 
 def _holefill(depth_mm: np.ndarray, iterations: int = 3, min_valid: int = 6) -> np.ndarray:
@@ -241,6 +246,55 @@ def _holefill(depth_mm: np.ndarray, iterations: int = 3, min_valid: int = 6) -> 
         fillable = holes & (scnt >= min_valid)
         d[fillable] = ssum[fillable] / scnt[fillable]
     return d.astype(np.uint16)
+
+
+def holefill_guided(depth_mm, guide_rgb, iterations: int = 3, radius: int = 3,
+                    sigma_color: float = 25.0) -> np.ndarray:
+    """Edge-aware hole fill (joint-bilateral): fill zero pixels from valid
+    neighbours weighted by spatial distance AND RGB colour similarity, so holes
+    fill *along* a surface but not *across* object edges. Original valid depth
+    is left untouched (this fills, it doesn't smooth)."""
+    guide = guide_rgb.astype(np.float32).mean(axis=2)
+    d = depth_mm.astype(np.float32).copy()
+    H, W = d.shape
+    r = radius
+    ys, xs = np.mgrid[-r:r + 1, -r:r + 1]
+    spatial = np.exp(-(xs ** 2 + ys ** 2) / (2.0 * max(r, 1) ** 2))
+    for _ in range(iterations):
+        holes = d == 0
+        if not holes.any():
+            break
+        Dp = np.pad(d, r)
+        Vp = np.pad((d > 0).astype(np.float32), r)
+        Gp = np.pad(guide, r, mode="edge")
+        num = np.zeros((H, W), np.float32)
+        den = np.zeros((H, W), np.float32)
+        for i, oy in enumerate(range(-r, r + 1)):
+            for j, ox in enumerate(range(-r, r + 1)):
+                ds = Dp[r + oy:r + oy + H, r + ox:r + ox + W]
+                vs = Vp[r + oy:r + oy + H, r + ox:r + ox + W]
+                gs = Gp[r + oy:r + oy + H, r + ox:r + ox + W]
+                w = spatial[i, j] * np.exp(-((guide - gs) ** 2) /
+                                           (2.0 * sigma_color ** 2)) * vs
+                num += w * ds
+                den += w
+        fill = holes & (den > 0)
+        d[fill] = num[fill] / den[fill]
+    return d.astype(np.uint16)
+
+
+def get_depth_mm_hq(index: int = 0, n: int = 5) -> np.ndarray:
+    """High-quality metric depth: temporal median + edge-aware (RGB-guided)
+    hole fill. Fills structured-light gaps without smearing object edges."""
+    frames = []
+    for _ in range(max(1, n)):
+        frames.append(get_depth_mm(index, True).astype(np.float32))
+    stack = np.stack(frames, axis=0)
+    stack[stack == 0] = np.nan
+    with np.errstate(all="ignore"):
+        med = np.nan_to_num(np.nanmedian(stack, axis=0), nan=0.0)
+    rgb = get_rgb(index)
+    return holefill_guided(med.astype(np.uint16), rgb)
 
 
 # 5-stop ramp: near = red -> far = blue
@@ -374,7 +428,8 @@ def look(prefix: str, n_denoise: int = 5, index: int = 0) -> dict:
     rgb_norm, gamma = auto_normalize_rgb(rgb)
     dark = rgb.astype(np.float32).mean() < 35
     ir = get_ir(index) if dark else None
-    depth = get_depth_mm_denoised(index, n=n_denoise, registered=True)
+    # edge-aware hole fill guided by the (contrast-normalized) RGB
+    depth = get_depth_mm_denoised(index, n=n_denoise, registered=True, guide_rgb=rgb_norm)
 
     dcolor, dmin, dmax = colorize_depth_mm(depth)
     summary = scene_summary(depth)
@@ -697,6 +752,31 @@ def _main(argv):
             code = set_led(state)
             print(f"LED set to {state} (code {code})")
             return 0
+        if cmd == "depthhq":
+            prefix = argv[1] if len(argv) > 1 else "out/depthhq"
+            Path(prefix).parent.mkdir(parents=True, exist_ok=True)
+            frames = [get_depth_mm(0, True).astype(np.float32) for _ in range(5)]
+            st = np.stack(frames); st[st == 0] = np.nan
+            base = np.nan_to_num(np.nanmedian(st, axis=0), nan=0.0).astype(np.uint16)
+            rgb = get_rgb()
+            simple = _holefill(base.copy())
+            guided = holefill_guided(base, rgb)
+            v = base[base > 0]
+            dmin, dmax = float(np.percentile(v, 2)), float(np.percentile(v, 98))
+            from PIL import ImageDraw
+            gap, top = 8, 24
+            canvas = Image.new("RGB", (_W * 3 + gap * 2, _H + top), (16, 16, 16))
+            dr = ImageDraw.Draw(canvas)
+            for i, (lbl, dd) in enumerate((("raw", base), ("simple fill", simple),
+                                           ("guided fill", guided))):
+                c, _, _ = colorize_depth_mm(dd, dmin, dmax)
+                cov = round(100 * (dd > 0).sum() / dd.size, 1)
+                x = i * (_W + gap)
+                canvas.paste(Image.fromarray(c, "RGB"), (x, top))
+                dr.text((x + 2, 4), f"{lbl}  {cov}%", font=_font(14), fill=(230, 230, 230))
+            canvas.save(f"{prefix}.png")
+            print(f"saved {prefix}.png  (raw/simple/guided coverage comparison)")
+            return 0
         if cmd == "capture":
             prefix = argv[1] if len(argv) > 1 else "shot"
             rgb, depth = get_rgb(), get_depth()
@@ -725,7 +805,7 @@ def _main(argv):
             _print(record_audio(prefix, secs, dev))
             return 0
     finally:
-        if cmd in ("tilt", "led", "capture", "look", "birdseye", "ref", "motion"):
+        if cmd in ("tilt", "led", "depthhq", "capture", "look", "birdseye", "ref", "motion"):
             stop()
     print(__doc__)
     return 1

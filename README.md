@@ -20,6 +20,7 @@ human) can consume the sensor by reading files.
 | `python kinect.py look out/g` | Auto-normalized RGB (IR fallback in the dark), denoised **metric** depth heatmap with a meters colorbar, a composite montage, and a JSON scene summary (nearest/median/farthest, L/C/R occupancy, foreground object count) |
 | `python kinect.py birdseye out/s` | Top-down occupancy floor-plan with metric axes |
 | `python kinect.py ref out/s` / `python kinect.py motion out/s` | Reference + edge-robust depth change/motion detection |
+| `python kinect.py depthhq out/d` | Depth **hole-fill comparison** — raw vs isotropic vs edge-aware (RGB-guided) fill |
 | `python kinect.py tilt 0` | Level/aim the motor (−30..30°) |
 | `python kinect.py led green` | Set the status LED (off/green/red/orange/blink-green/blink-orange-red) |
 | `python kinect_audio.py record out/m 5` | 4-channel mic-array WAV + waveform + spectrogram + per-channel levels |

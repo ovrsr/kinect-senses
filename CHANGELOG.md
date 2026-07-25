@@ -8,6 +8,12 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Edge-aware depth hole-fill** (`kinect.holefill_guided` / `get_depth_mm_hq`):
+  a joint-bilateral fill that closes structured-light gaps using RGB colour
+  similarity as guidance — filling *along* surfaces but not *across* object
+  edges (crisper boundaries, ~+6% coverage vs the old isotropic fill). `look`
+  now uses it, and `python kinect.py depthhq` renders a raw/simple/guided
+  comparison.
 - **Colored 3D point cloud** (`kinect_pointcloud.py` + `kinect_pointcloud` MCP
   tool): unprojects the registered depth + RGB into metric 3D points, exports a
   binary PLY (MeshLab / CloudCompare / Blender), and renders the cloud from a
