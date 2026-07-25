@@ -161,6 +161,13 @@ usbprobe.py       # libusb USB descriptor dumper
 patches/          # the libfreenect Windows/gcc fix
 ```
 
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately
+per [SECURITY.md](SECURITY.md). Notable changes are tracked in
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Credits & license
 
 Built on [libfreenect](https://github.com/OpenKinect/libfreenect) (Apache-2.0 /

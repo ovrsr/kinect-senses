@@ -1,0 +1,39 @@
+kinect-senses
+Copyright 2026 ovrsr
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------------
+Third-party components
+------------------------------------------------------------------------------
+
+kinect-senses interoperates with, and its build/setup process fetches, the
+following third-party software. These components are NOT redistributed in this
+repository — `setup.ps1` downloads or clones them at build time — and each
+remains under its own license and copyright:
+
+* libfreenect — The OpenKinect Project
+    https://github.com/OpenKinect/libfreenect
+    Dual-licensed under the Apache License 2.0 and the GNU GPL v2.0.
+    A small patch in this repo (patches/libfreenect-mingw-sleep.patch) adds a
+    POSIX sleep() shim to platform/windows/unistd.h so it builds with modern
+    MinGW-w64 gcc. That patch is a derivative of libfreenect and is offered
+    under the same terms as libfreenect.
+
+* libusb — The libusb Project
+    https://github.com/libusb/libusb
+    Licensed under the GNU LGPL v2.1 or later.
+
+* Zadig / libwdi — Pete Batard (Akeo Consulting)
+    https://github.com/pbatard/libwdi
+    Used (optionally, on demand) to install libusb-compatible USB drivers.
+    Licensed under the GNU LGPL v3 or later.
+
+------------------------------------------------------------------------------
+Trademarks
+------------------------------------------------------------------------------
+
+This project is not affiliated with, sponsored by, or endorsed by Microsoft
+Corporation, The OpenKinect Project, or the libusb project. "Kinect" and
+"Xbox" are trademarks of Microsoft Corporation, used here only to identify the
+compatible hardware.
