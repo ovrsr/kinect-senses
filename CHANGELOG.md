@@ -8,6 +8,11 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **3D body skeleton** (`kinect_pose.py` + `kinect_pose` MCP tool): MediaPipe
+  BlazePose on the RGB frame, with each of the 33 joints lifted to metric 3D by
+  sampling the registered depth — an annotated skeleton image + per-joint `xyz`
+  and torso distance. Optional dep in `requirements-pose.txt`; the pose model
+  auto-downloads on first run.
 - Status **LED** control (`python kinect.py led <state>` / `kinect.set_led`):
   off / green / red / orange / blink-green / blink-orange-red — a hardware
   status notifier for agents.

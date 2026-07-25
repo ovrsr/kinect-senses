@@ -78,6 +78,23 @@ def kinect_look() -> list:
             _safe_stop()
 
 
+@mcp.tool(description="Detect a person and return a 3D skeleton: an annotated "
+          "image with the pose overlaid, plus per-joint 3D coordinates (metres, "
+          "camera frame) and the torso distance. RGB pose (MediaPipe) lifted to "
+          "3D via the Kinect depth. Returns {person:false} if nobody is in view.")
+def kinect_pose() -> list:
+    with _LOCK:
+        try:
+            import kinect_pose as kp
+            img, summary = kp.detect()
+            compact = {k: v for k, v in summary.items() if k != "all_joints"}
+            return [_png(img), _json(compact)]
+        except Exception as e:
+            return [_err("kinect_pose", e)]
+        finally:
+            _safe_stop()
+
+
 @mcp.tool(description="Read the room's audio via the 4-mic array for `seconds` "
           "(1-15). Returns a spectrogram image + per-channel levels (dBFS). "
           "PRIVACY: this records the microphone.")
