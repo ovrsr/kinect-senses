@@ -95,6 +95,23 @@ def kinect_pose() -> list:
             _safe_stop()
 
 
+@mcp.tool(description="Capture a colored 3D point cloud and return a rendered "
+          "oblique view showing the scene's 3D structure, plus stats (point "
+          "count and metric bounds). For the PLY export use kinect_pointcloud.py.")
+def kinect_pointcloud() -> list:
+    with _LOCK:
+        try:
+            import kinect_pointcloud as kpc
+            pts, cols = kpc.capture()
+            if pts.shape[0] == 0:
+                return ["no depth points captured (device/scene?)."]
+            return [_png(kpc.render(pts, cols, yaw=35, pitch=12)), _json(kpc._stats(pts))]
+        except Exception as e:
+            return [_err("kinect_pointcloud", e)]
+        finally:
+            _safe_stop()
+
+
 @mcp.tool(description="Read the room's audio via the 4-mic array for `seconds` "
           "(1-15). Returns a spectrogram image + per-channel levels (dBFS). "
           "PRIVACY: this records the microphone.")

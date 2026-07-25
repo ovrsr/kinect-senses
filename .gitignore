@@ -15,6 +15,7 @@ audios.bin
 # downloaded ML models (auto-fetched on first run)
 models/
 
-# Captured sensor output — images/audio/JSON, may contain personal data
+# Captured sensor output — images/audio/point clouds, may contain personal data
 out/
 *.wav
+*.ply

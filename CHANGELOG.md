@@ -8,6 +8,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Colored 3D point cloud** (`kinect_pointcloud.py` + `kinect_pointcloud` MCP
+  tool): unprojects the registered depth + RGB into metric 3D points, exports a
+  binary PLY (MeshLab / CloudCompare / Blender), and renders the cloud from a
+  rotated viewpoint so the 3D structure is viewable as an image.
 - **3D body skeleton** (`kinect_pose.py` + `kinect_pose` MCP tool): MediaPipe
   BlazePose on the RGB frame, with each of the 33 joints lifted to metric 3D by
   sampling the registered depth — an annotated skeleton image + per-joint `xyz`

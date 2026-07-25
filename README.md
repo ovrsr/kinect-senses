@@ -26,6 +26,7 @@ human) can consume the sensor by reading files.
 | `python kinect_doa.py listen out/d 5` | Sound **direction of arrival** (azimuth) + DOA-over-time heatmap + polar plot |
 | `python kinect_fusion.py out/fix 5` | **3D fix on a sound source** — azimuth mapped into the depth frame, distance read out, annotated image + `xyz` |
 | `python kinect_pose.py out/p` | **3D body skeleton** — MediaPipe pose lifted to metric 3D via the depth (annotated image + per-joint `xyz`). Needs `pip install -r requirements-pose.txt` |
+| `python kinect_pointcloud.py out/c` | **Colored 3D point cloud** — registered depth + RGB → binary PLY (MeshLab/CloudCompare/Blender) + rotated preview renders |
 
 `python usbprobe.py` dumps the Kinect USB descriptor tree (handy for debugging).
 
@@ -159,9 +160,10 @@ claude mcp add kinect -- python C:/path/to/kinect-senses/mcp_server.py
 }
 ```
 
-Tools: `kinect_look`, `kinect_pose`, `kinect_hear`, `kinect_locate_sound`,
-`kinect_set_led`, `kinect_tilt`, `kinect_health`. (`kinect_pose` needs
-`requirements-pose.txt`; the pose model auto-downloads on first use.)
+Tools: `kinect_look`, `kinect_pose`, `kinect_pointcloud`, `kinect_hear`,
+`kinect_locate_sound`, `kinect_set_led`, `kinect_tilt`, `kinect_health`.
+(`kinect_pose` needs `requirements-pose.txt`; the pose model auto-downloads on
+first use.)
 
 - The server runs where the hardware is (local **stdio** transport). Only one
   process can own the Kinect over USB, so every call is serialized behind a lock.
@@ -198,6 +200,7 @@ kinect_audio.py   # 4-mic array capture over libusb (async iso, hand-rolled ctyp
 kinect_doa.py     # SRP-PHAT direction of arrival
 kinect_fusion.py  # DOA x depth -> 3D sound-source fix
 kinect_pose.py    # 3D body skeleton (MediaPipe pose lifted via depth)
+kinect_pointcloud.py  # colored 3D point cloud -> PLY + preview renders
 mcp_server.py     # Model Context Protocol bridge (agent access)
 usbprobe.py       # libusb USB descriptor dumper
 patches/          # the libfreenect Windows/gcc fix
