@@ -8,6 +8,12 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Motor-dither depth** (`kinect.get_depth_mm_dither` / `python kinect.py
+  depthdither`): captures depth at several small tilt offsets to decorrelate the
+  fixed laser speckle, aligns each frame by its induced vertical shift, and
+  merges — recovering *real* depth (not interpolation) in speckle/edge gaps and
+  denoising the result. Honest, modest gain (~+3% real coverage on a test scene)
+  because the motor is pitch-only; opt-in and slow (it moves the motor).
 - **Edge-aware depth hole-fill** (`kinect.holefill_guided` / `get_depth_mm_hq`):
   a joint-bilateral fill that closes structured-light gaps using RGB colour
   similarity as guidance — filling *along* surfaces but not *across* object

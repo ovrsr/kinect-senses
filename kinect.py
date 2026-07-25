@@ -297,6 +297,81 @@ def get_depth_mm_hq(index: int = 0, n: int = 5) -> np.ndarray:
     return holefill_guided(med.astype(np.uint16), rgb)
 
 
+def _median_depth_raw(index: int, n: int) -> np.ndarray:
+    fr = [get_depth_mm(index, True).astype(np.float32) for _ in range(max(1, n))]
+    st = np.stack(fr, axis=0)
+    st[st == 0] = np.nan
+    with np.errstate(all="ignore"):
+        m = np.nan_to_num(np.nanmedian(st, axis=0), nan=0.0)
+    return m.astype(np.uint16)
+
+
+def _vshift(a: np.ndarray, s: int) -> np.ndarray:
+    """Shift a 2D array vertically by s pixels (positive = down); zero-fill."""
+    if s == 0:
+        return a.copy()
+    out = np.zeros_like(a)
+    if s > 0:
+        out[s:, :] = a[:-s, :]
+    else:
+        out[:s, :] = a[-s:, :]
+    return out
+
+
+def _best_vshift(ref: np.ndarray, frame: np.ndarray, maxs: int = 22) -> int:
+    """Vertical pixel shift that best aligns `frame` to `ref` (min median |Δdepth|)."""
+    rf = ref.astype(np.float32)
+    best_s, best_e = 0, np.inf
+    for s in range(-maxs, maxs + 1):
+        sf = _vshift(frame, s).astype(np.float32)
+        both = (rf > 0) & (sf > 0)
+        if both.sum() < 4000:
+            continue
+        e = float(np.median(np.abs(rf[both] - sf[both])))
+        if e < best_e:
+            best_e, best_s = e, s
+    return best_s
+
+
+def _settle_tilt(angle: int, index: int = 0, timeout_s: float = 12.0):
+    import time
+    set_tilt(angle, index)
+    for _ in range(int(timeout_s / 0.4)):
+        time.sleep(0.4)
+        if get_tilt(index)["status"] != "moving":
+            break
+    time.sleep(0.3)
+
+
+def get_depth_mm_dither(index: int = 0, n_per: int = 3,
+                        offsets=(0, 1, -1, 2)) -> np.ndarray:
+    """Motor-dither depth: capture at several small tilt offsets to decorrelate
+    the fixed laser speckle, align each frame by its tilt-induced vertical shift,
+    and merge — recovering REAL depth in speckle/occlusion gaps a single view
+    misses. Restores the starting tilt when done. Slow (moves the motor)."""
+    base = int(round(get_tilt(index)["angle_deg"]))
+    base = max(TILT_MIN + 2, min(TILT_MAX - 2, base))
+    frames = []
+    for off in offsets:
+        _settle_tilt(base + off, index)
+        frames.append(_median_depth_raw(index, n_per))
+    _settle_tilt(base, index)
+
+    ref = frames[0].astype(np.float32)
+    sumd = np.where(ref > 0, ref, 0.0)
+    count = (ref > 0).astype(np.float32)
+    for fr in frames[1:]:
+        s = _best_vshift(frames[0], fr)
+        af = _vshift(fr, s).astype(np.float32)
+        v = af > 0
+        sumd[v] += af[v]
+        count[v] += 1
+    merged = np.zeros(ref.shape, np.float32)
+    nz = count > 0
+    merged[nz] = sumd[nz] / count[nz]
+    return merged.astype(np.uint16)
+
+
 # 5-stop ramp: near = red -> far = blue
 _CMAP_POS = [0.0, 0.25, 0.5, 0.75, 1.0]
 _CMAP_R = [255, 255, 0, 0, 0]
@@ -777,6 +852,36 @@ def _main(argv):
             canvas.save(f"{prefix}.png")
             print(f"saved {prefix}.png  (raw/simple/guided coverage comparison)")
             return 0
+        if cmd == "depthdither":
+            prefix = argv[1] if len(argv) > 1 else "out/depthdither"
+            Path(prefix).parent.mkdir(parents=True, exist_ok=True)
+            single = _median_depth_raw(0, 3)
+            dith = get_depth_mm_dither(0)
+            v = single[single > 0]
+            dmin, dmax = float(np.percentile(v, 2)), float(np.percentile(v, 98))
+            recovered = (dith > 0) & (single == 0)
+            csingle = colorize_depth_mm(single, dmin, dmax)[0]
+            cdith = colorize_depth_mm(dith, dmin, dmax)[0]
+            crec = csingle.copy(); crec[recovered] = (60, 255, 60)
+            cov_s = round(100 * (single > 0).sum() / single.size, 1)
+            cov_d = round(100 * (dith > 0).sum() / dith.size, 1)
+            rec_pct = round(100 * recovered.sum() / single.size, 1)
+            from PIL import ImageDraw
+            gap, top = 8, 24
+            canvas = Image.new("RGB", (_W * 3 + gap * 2, _H + top), (16, 16, 16))
+            dr = ImageDraw.Draw(canvas)
+            for i, (lbl, c) in enumerate((
+                    (f"single  {cov_s}%", csingle),
+                    (f"dither-merged  {cov_d}%", cdith),
+                    (f"recovered (green) +{rec_pct}%", crec))):
+                x = i * (_W + gap)
+                canvas.paste(Image.fromarray(c, "RGB"), (x, top))
+                dr.text((x + 2, 4), lbl, font=_font(14), fill=(230, 230, 230))
+            canvas.save(f"{prefix}.png")
+            print(f"single {cov_s}% -> dither-merged {cov_d}% "
+                  f"(recovered {rec_pct}% real pixels)")
+            print(f"saved {prefix}.png")
+            return 0
         if cmd == "capture":
             prefix = argv[1] if len(argv) > 1 else "shot"
             rgb, depth = get_rgb(), get_depth()
@@ -805,7 +910,8 @@ def _main(argv):
             _print(record_audio(prefix, secs, dev))
             return 0
     finally:
-        if cmd in ("tilt", "led", "depthhq", "capture", "look", "birdseye", "ref", "motion"):
+        if cmd in ("tilt", "led", "depthhq", "depthdither", "capture", "look",
+                   "birdseye", "ref", "motion"):
             stop()
     print(__doc__)
     return 1
