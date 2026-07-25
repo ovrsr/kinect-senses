@@ -6,8 +6,14 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-25
+
 ### Added
 
+- **Tilt-sweep FOV panorama** (`kinect.sweep_fov` / `python kinect.py sweep`):
+  sweeps the motor across its range and stitches depth + RGB into a taller
+  vertical field of view (~95° vs ~49° single-frame), each frame offset by its
+  measured tilt (`fy·Δθ`) and overlaps averaged.
 - **Motor-dither depth** (`kinect.get_depth_mm_dither` / `python kinect.py
   depthdither`): captures depth at several small tilt offsets to decorrelate the
   fixed laser speckle, aligns each frame by its induced vertical shift, and
@@ -71,5 +77,6 @@ with Memory Integrity / HVCI enabled).
   front/back ambiguity (assumes the source is in front of the sensor).
 - Driver binding is guided (a few Zadig clicks), not fully unattended.
 
-[Unreleased]: https://github.com/ovrsr/kinect-senses/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ovrsr/kinect-senses/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ovrsr/kinect-senses/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ovrsr/kinect-senses/releases/tag/v0.1.0

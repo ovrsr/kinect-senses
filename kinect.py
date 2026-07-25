@@ -372,6 +372,48 @@ def get_depth_mm_dither(index: int = 0, n_per: int = 3,
     return merged.astype(np.uint16)
 
 
+def sweep_fov(index: int = 0, angles=(-24, -12, 0, 12, 24), n_per: int = 3):
+    """Tilt-sweep panorama: capture depth+RGB across a range of motor angles and
+    stitch them vertically (each frame offset by fy*Δθ) into a taller field of
+    view. Returns (depth_pano uint16, rgb_pano uint8, vertical_fov_deg).
+    Restores the starting tilt. Slow (sweeps the motor)."""
+    start = int(round(get_tilt(index)["angle_deg"]))
+    caps = []
+    for a in angles:
+        a = int(max(TILT_MIN, min(TILT_MAX, a)))
+        _settle_tilt(a, index)
+        meas = get_tilt(index)["angle_deg"]
+        caps.append((meas, _median_depth_raw(index, n_per), get_rgb(index)))
+    _settle_tilt(start, index)
+
+    thetas = [c[0] for c in caps]
+    tmax = max(thetas)
+    offs = [int(round(_FY * np.radians(tmax - t))) for t in thetas]
+    Ht = _H + max(offs)
+    dacc = np.zeros((Ht, _W), np.float32)
+    dcnt = np.zeros((Ht, _W), np.float32)
+    racc = np.zeros((Ht, _W, 3), np.float32)
+    rcnt = np.zeros((Ht, _W, 1), np.float32)
+    for (meas, depth, rgb), off in zip(caps, offs):
+        dsub = dacc[off:off + _H]
+        csub = dcnt[off:off + _H]
+        dv = depth.astype(np.float32)
+        v = dv > 0
+        dsub[v] += dv[v]
+        csub[v] += 1
+        racc[off:off + _H] += rgb
+        rcnt[off:off + _H] += 1
+
+    dpano = np.zeros((Ht, _W), np.uint16)
+    nz = dcnt > 0
+    dpano[nz] = (dacc[nz] / dcnt[nz]).astype(np.uint16)
+    rpano = np.zeros((Ht, _W, 3), np.uint8)
+    rz = rcnt[:, :, 0] > 0
+    rpano[rz] = (racc[rz] / rcnt[rz]).astype(np.uint8)
+    vfov = (tmax - min(thetas)) + np.degrees(2 * np.arctan((_H / 2) / _FY))
+    return dpano, rpano, round(float(vfov), 1)
+
+
 # 5-stop ramp: near = red -> far = blue
 _CMAP_POS = [0.0, 0.25, 0.5, 0.75, 1.0]
 _CMAP_R = [255, 255, 0, 0, 0]
@@ -882,6 +924,21 @@ def _main(argv):
                   f"(recovered {rec_pct}% real pixels)")
             print(f"saved {prefix}.png")
             return 0
+        if cmd == "sweep":
+            prefix = argv[1] if len(argv) > 1 else "out/sweep"
+            Path(prefix).parent.mkdir(parents=True, exist_ok=True)
+            dpano, rpano, vfov = sweep_fov(0)
+            valid = dpano > 0
+            vv = dpano[valid]
+            dmin, dmax = float(np.percentile(vv, 2)), float(np.percentile(vv, 98))
+            cd = colorize_depth_mm(dpano, dmin, dmax)[0]
+            Image.fromarray(cd, "RGB").save(f"{prefix}_depth.png")
+            Image.fromarray(rpano, "RGB").save(f"{prefix}_rgb.png")
+            cov = round(100 * valid.sum() / dpano.size, 1)
+            print(f"vertical FOV ~{vfov} deg  |  panorama {rpano.shape[1]}x{rpano.shape[0]}"
+                  f"  |  depth coverage {cov}%")
+            print(f"saved {prefix}_depth.png, {prefix}_rgb.png")
+            return 0
         if cmd == "capture":
             prefix = argv[1] if len(argv) > 1 else "shot"
             rgb, depth = get_rgb(), get_depth()
@@ -910,8 +967,8 @@ def _main(argv):
             _print(record_audio(prefix, secs, dev))
             return 0
     finally:
-        if cmd in ("tilt", "led", "depthhq", "depthdither", "capture", "look",
-                   "birdseye", "ref", "motion"):
+        if cmd in ("tilt", "led", "depthhq", "depthdither", "sweep", "capture",
+                   "look", "birdseye", "ref", "motion"):
             stop()
     print(__doc__)
     return 1
