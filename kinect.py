@@ -8,6 +8,7 @@ Everything Claude "sees" comes out as files it can Read: PNG images and JSON.
 
 Capabilities / CLI:
     python kinect.py info                 # load libs, report exports
+    python kinect.py gui                  # Tkinter live viewer + manual controls
     python kinect.py tilt [deg]           # level/aim the motor (-30..30), default 0
     python kinect.py capture <prefix>     # legacy: raw RGB + 11-bit depth PNGs
     python kinect.py look <prefix>        # the "glance": normalized RGB (+IR if dark),
@@ -948,6 +949,9 @@ def _main(argv):
             Image.fromarray(dc, "RGB").save(f"{prefix}_depth.png")
             print(f"saved {prefix}_rgb.png, {prefix}_depth.png")
             return 0
+        if cmd == "gui":
+            import kinect_gui
+            return kinect_gui.main()
         if cmd == "look":
             _print(look(argv[1] if len(argv) > 1 else "look"))
             return 0
