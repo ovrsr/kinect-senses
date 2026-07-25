@@ -17,6 +17,7 @@ human) can consume the sensor by reading files.
 
 | Command | Output |
 |---|---|
+| `python kinect.py gui` | **Live GUI** — RGB/IR + colorized metric depth side by side, a depth pixel probe (mm and unprojected XYZ under the cursor), tilt/LED controls, and one-click buttons for every action below with JSON results and image previews |
 | `python kinect.py look out/g` | Auto-normalized RGB (IR fallback in the dark), denoised **metric** depth heatmap with a meters colorbar, a composite montage, and a JSON scene summary (nearest/median/farthest, L/C/R occupancy, foreground object count) |
 | `python kinect.py birdseye out/s` | Top-down occupancy floor-plan with metric axes |
 | `python kinect.py ref out/s` / `python kinect.py motion out/s` | Reference + edge-robust depth change/motion detection |
@@ -31,7 +32,9 @@ human) can consume the sensor by reading files.
 | `python kinect_pose.py out/p` | **3D body skeleton** — MediaPipe pose lifted to metric 3D via the depth (annotated image + per-joint `xyz`). Needs `pip install -r requirements-pose.txt` |
 | `python kinect_pointcloud.py out/c` | **Colored 3D point cloud** — registered depth + RGB → binary PLY (MeshLab/CloudCompare/Blender) + rotated preview renders |
 
-`python usbprobe.py` dumps the Kinect USB descriptor tree (handy for debugging).
+`python usbprobe.py` dumps the Kinect USB descriptor tree, and
+`python streambench.py` measures per-stream USB health (fps + dropped-packet
+rate) — both handy for debugging.
 
 ## Quick start (scripted)
 
@@ -188,6 +191,17 @@ first use.)
 - **Fusion** maps DOA azimuth to a depth column with `AZ_SIGN = -1` (the camera
   faces you, so your right is image-left). Mic and lens are a few cm apart on
   the bar — negligible parallax beyond ~1 m.
+- **Running depth *and* video at once is a USB bandwidth gamble.** The two
+  cameras need ~22 MB/s — most of a USB 2.0 bus — and some host controllers
+  can't sustain it, which shows up as libfreenect `Lost too many packets,
+  resyncing` spam and a stuttery live view. On the dev machine (Kinect alone on
+  an ASMedia USB 3.1 xHCI controller) either stream alone runs ~29 fps
+  loss-free, while both together fall to 9–20 fps with heavy loss that worsens
+  the longer the device stays powered. Measure yours with `python
+  streambench.py`; if the `both` row reports lost packets, use one of the GUI's
+  single-stream modes or try a different USB controller. Tuning libfreenect's
+  isochronous transfer geometry (`PKTS_PER_XFER`/`NUM_XFERS`) does *not* help —
+  seven configurations were benchmarked and the stock Windows 32×8 won.
 - Depth colorization, occupancy, and 3D use the Kinect RGB intrinsics
   `fx=fy=525, cx=319.5, cy=239.5` (registered depth is aligned to the 640×480
   RGB frame).
@@ -199,6 +213,7 @@ setup.ps1         # idempotent installer/builder/verifier
 bind-drivers.ps1  # guided + verified USB driver binding (Zadig)
 doctor.ps1        # health check (-Live for a real capture)
 kinect.py         # RGB/IR/metric-depth, look, birdseye, motion, tilt (libfreenect_sync via ctypes)
+kinect_gui.py     # Tkinter live viewer + manual controls (python kinect.py gui)
 kinect_audio.py   # 4-mic array capture over libusb (async iso, hand-rolled ctypes)
 kinect_doa.py     # SRP-PHAT direction of arrival
 kinect_fusion.py  # DOA x depth -> 3D sound-source fix
@@ -206,6 +221,7 @@ kinect_pose.py    # 3D body skeleton (MediaPipe pose lifted via depth)
 kinect_pointcloud.py  # colored 3D point cloud -> PLY + preview renders
 mcp_server.py     # Model Context Protocol bridge (agent access)
 usbprobe.py       # libusb USB descriptor dumper
+streambench.py    # USB stream health benchmark (fps + dropped-packet rate)
 patches/          # the libfreenect Windows/gcc fix
 ```
 

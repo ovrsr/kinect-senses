@@ -6,6 +6,32 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Live GUI** (`kinect_gui.py` / `python kinect.py gui`): a Tkinter control
+  panel for driving and observing the sensor by hand. Side-by-side live RGB (or
+  IR) and colorized metric depth, with a depth pixel probe that reports mm and
+  the unprojected XYZ under the cursor; tilt slider + LED buttons with a live
+  angle/accelerometer readout; selectable stream mode, temporal-median depth,
+  fixed or auto depth colour range, and low-light RGB normalization; one-click
+  buttons for every capability (look, birdseye, ref/motion, depth HQ/dither,
+  sweep, point cloud, pose, audio, DOA) with JSON results and image previews,
+  plus a "save frames" button that writes exactly what is on screen. All
+  libfreenect calls run on one dedicated worker thread — the sync API keeps a
+  single global device handle — while Tk only touches queues.
+- **`streambench.py`**: measures per-stream USB health (achieved fps and
+  libfreenect's dropped-packet/resync rate) so USB ports and host controllers
+  can be compared objectively.
+
+### Fixed
+
+- Live-view rendering no longer stalls the UI thread: depth colorization for the
+  on-screen view now uses a 256-entry LUT (~6 ms/frame vs ~37 ms for the
+  per-pixel `colorize_depth_mm`, max 4/255 channel difference), all pixel work
+  moved off the Tk main thread, and the frame pump renders only the newest frame
+  instead of working through a backlog. Saved outputs still use the exact
+  full-precision colorizer.
+
 ## [0.2.0] - 2026-07-25
 
 ### Added
