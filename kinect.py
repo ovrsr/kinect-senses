@@ -95,6 +95,8 @@ def _load():
     lib.freenect_sync_get_tilt_state.restype = ctypes.c_int
     lib.freenect_sync_get_tilt_state.argtypes = [
         ctypes.POINTER(ctypes.POINTER(RawTiltState)), ctypes.c_int]
+    lib.freenect_sync_set_led.restype = ctypes.c_int
+    lib.freenect_sync_set_led.argtypes = [ctypes.c_int, ctypes.c_int]
     return lib
 
 
@@ -186,6 +188,28 @@ def set_tilt(degrees: float, index: int = 0) -> int:
     if rc != 0:
         raise RuntimeError(f"freenect_sync_set_tilt_degs({angle}) failed (rc={rc})")
     return angle
+
+
+# --- status LED (freenect_led_options) --------------------------------------
+
+LED_OFF = 0
+LED_GREEN = 1
+LED_RED = 2
+LED_ORANGE = 3               # firmware calls it yellow; it's amber/orange
+LED_BLINK_GREEN = 4
+LED_BLINK_ORANGE_RED = 6
+_LED_NAMES = {"off": 0, "green": 1, "red": 2, "orange": 3, "yellow": 3,
+              "blink-green": 4, "blink": 4, "blink-orange-red": 6, "alarm": 6}
+
+
+def set_led(state, index: int = 0) -> int:
+    """Set the Kinect status LED. `state` is an int (LED_*) or a name:
+    'off', 'green', 'red', 'orange', 'blink-green', 'blink-orange-red'."""
+    code = _LED_NAMES[state] if isinstance(state, str) else int(state)
+    rc = _lib().freenect_sync_set_led(code, index)
+    if rc != 0:
+        raise RuntimeError(f"freenect_sync_set_led({state}) failed (rc={rc})")
+    return code
 
 
 # --- depth denoise + visualization -----------------------------------------
@@ -668,6 +692,11 @@ def _main(argv):
                     break
             print(f"after:  {st['angle_deg']:+.1f} deg  accel={st['accel']}  status={st['status']}")
             return 0
+        if cmd == "led":
+            state = argv[1] if len(argv) > 1 else "green"
+            code = set_led(state)
+            print(f"LED set to {state} (code {code})")
+            return 0
         if cmd == "capture":
             prefix = argv[1] if len(argv) > 1 else "shot"
             rgb, depth = get_rgb(), get_depth()
@@ -696,7 +725,7 @@ def _main(argv):
             _print(record_audio(prefix, secs, dev))
             return 0
     finally:
-        if cmd in ("tilt", "capture", "look", "birdseye", "ref", "motion"):
+        if cmd in ("tilt", "led", "capture", "look", "birdseye", "ref", "motion"):
             stop()
     print(__doc__)
     return 1

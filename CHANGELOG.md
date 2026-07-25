@@ -6,6 +6,17 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Status **LED** control (`python kinect.py led <state>` / `kinect.set_led`):
+  off / green / red / orange / blink-green / blink-orange-red — a hardware
+  status notifier for agents.
+- **MCP bridge** (`mcp_server.py`): exposes the Kinect to Model Context Protocol
+  clients (Claude Desktop, Claude Code, …) with tools `kinect_look`,
+  `kinect_hear`, `kinect_locate_sound`, `kinect_set_led`, `kinect_tilt`, and
+  `kinect_health`. Tool results return PNG images + JSON; hardware access is
+  serialized behind a lock. Optional dep in `requirements-mcp.txt`.
+
 ## [0.1.0] - 2026-07-25
 
 Initial release: a Windows toolkit turning a first-generation Kinect into a

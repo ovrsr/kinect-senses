@@ -21,6 +21,7 @@ human) can consume the sensor by reading files.
 | `python kinect.py birdseye out/s` | Top-down occupancy floor-plan with metric axes |
 | `python kinect.py ref out/s` / `python kinect.py motion out/s` | Reference + edge-robust depth change/motion detection |
 | `python kinect.py tilt 0` | Level/aim the motor (−30..30°) |
+| `python kinect.py led green` | Set the status LED (off/green/red/orange/blink-green/blink-orange-red) |
 | `python kinect_audio.py record out/m 5` | 4-channel mic-array WAV + waveform + spectrogram + per-channel levels |
 | `python kinect_doa.py listen out/d 5` | Sound **direction of arrival** (azimuth) + DOA-over-time heatmap + polar plot |
 | `python kinect_fusion.py out/fix 5` | **3D fix on a sound source** — azimuth mapped into the depth frame, distance read out, annotated image + `xyz` |
@@ -129,6 +130,43 @@ python kinect_doa.py listen out/doa 5
 python kinect_fusion.py out/fix 5
 ```
 
+## Agent access (MCP)
+
+`mcp_server.py` exposes the Kinect to any
+[Model Context Protocol](https://modelcontextprotocol.io) client (Claude
+Desktop, Claude Code, …) so an agent can *see* through it and drive its status
+LED / motor. Tool results return PNG images (which vision models consume) plus
+JSON.
+
+```powershell
+pip install -r requirements-mcp.txt
+```
+
+Register with Claude Code:
+
+```
+claude mcp add kinect -- python C:/path/to/kinect-senses/mcp_server.py
+```
+
+…or in Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "kinect": { "command": "python", "args": ["C:/path/to/kinect-senses/mcp_server.py"] }
+  }
+}
+```
+
+Tools: `kinect_look`, `kinect_hear`, `kinect_locate_sound`, `kinect_set_led`,
+`kinect_tilt`, `kinect_health`.
+
+- The server runs where the hardware is (local **stdio** transport). Only one
+  process can own the Kinect over USB, so every call is serialized behind a lock.
+- **Privacy:** `kinect_hear` and `kinect_locate_sound` record the microphone.
+  MCP clients prompt before each tool call — treat those as sensitive, and use
+  the LED (`kinect_set_led "blink-green"`) as a visible "sensor active" cue.
+
 ## Notes & caveats
 
 - **Mic privacy:** Windows may block app microphone access machine-wide. The
@@ -157,6 +195,7 @@ kinect.py         # RGB/IR/metric-depth, look, birdseye, motion, tilt (libfreene
 kinect_audio.py   # 4-mic array capture over libusb (async iso, hand-rolled ctypes)
 kinect_doa.py     # SRP-PHAT direction of arrival
 kinect_fusion.py  # DOA x depth -> 3D sound-source fix
+mcp_server.py     # Model Context Protocol bridge (agent access)
 usbprobe.py       # libusb USB descriptor dumper
 patches/          # the libfreenect Windows/gcc fix
 ```
