@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build toolchain & downloaded binaries (reproduce via README)
+dist/
+deps/
+build/
+tools/
+libfreenect/
+audios.bin
+
+# Captured sensor output — images/audio/JSON, may contain personal data
+out/
+*.wav

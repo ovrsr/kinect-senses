@@ -1,0 +1,15 @@
+diff --git a/platform/windows/unistd.h b/platform/windows/unistd.h
+index 86d41ad..8d8935d 100644
+--- a/platform/windows/unistd.h
++++ b/platform/windows/unistd.h
+@@ -53,3 +53,10 @@ static void usleep(__int64 usec)
+ 	WaitForSingleObject(timer, INFINITE);
+ 	CloseHandle(timer);
+ }
++
++// POSIX sleep(3): seconds. Windows only has Sleep() (milliseconds).
++static unsigned int sleep(unsigned int seconds)
++{
++	Sleep(seconds * 1000);
++	return 0;
++}
