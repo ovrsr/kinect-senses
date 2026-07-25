@@ -27,6 +27,29 @@ human) can consume the sensor by reading files.
 
 `python usbprobe.py` dumps the Kinect USB descriptor tree (handy for debugging).
 
+## Quick start (scripted)
+
+On Windows x64 with [scoop](https://scoop.sh), git, and Python 3.10+ installed:
+
+```powershell
+git clone https://github.com/ovrsr/kinect-senses
+cd kinect-senses
+./setup.ps1
+```
+
+`setup.ps1` is **idempotent** (each step detects whether it's already done):
+it installs the toolchain, fetches libusb, builds libfreenect, assembles
+`dist/`, installs the Python deps, walks you through the USB driver binding, and
+verifies the result. Helpers:
+
+- `./doctor.ps1` — health check (toolchain, DLLs, deps, driver bindings). Add
+  `-Live` to also grab a real frame + mic read.
+- `./bind-drivers.ps1` — (re)bind just the USB drivers, guided and verified;
+  `-Check` reports current bindings without changing anything.
+
+The sections below explain what those scripts do, for a manual install or a
+non-scoop machine.
+
 ## Requirements
 
 - Windows 10/11 x64 with a first-gen Kinect (+ its USB/power adapter for the
@@ -40,7 +63,7 @@ human) can consume the sensor by reading files.
 - **[Zadig](https://zadig.akeo.ie/)** to bind the Kinect USB interfaces to
   libusb-compatible drivers.
 
-## Build the native libraries (`freenect` + `freenect_sync`)
+## Manual build (what `setup.ps1` automates)
 
 1. **Clone libfreenect and apply the one-line Windows/gcc fix** (gcc 14+ errors
    on the implicit `sleep()` in `usb_libusb10.c`):
@@ -127,10 +150,13 @@ python kinect_fusion.py out/fix 5
 ## Layout
 
 ```
+setup.ps1         # idempotent installer/builder/verifier
+bind-drivers.ps1  # guided + verified USB driver binding (Zadig)
+doctor.ps1        # health check (-Live for a real capture)
 kinect.py         # RGB/IR/metric-depth, look, birdseye, motion, tilt (libfreenect_sync via ctypes)
 kinect_audio.py   # 4-mic array capture over libusb (async iso, hand-rolled ctypes)
 kinect_doa.py     # SRP-PHAT direction of arrival
-kinect_fusion.py  # DOA × depth → 3D sound-source fix
+kinect_fusion.py  # DOA x depth -> 3D sound-source fix
 usbprobe.py       # libusb USB descriptor dumper
 patches/          # the libfreenect Windows/gcc fix
 ```
