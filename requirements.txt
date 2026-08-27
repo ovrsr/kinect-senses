@@ -3,3 +3,4 @@ scipy>=1.10
 pillow>=9.0
 sounddevice>=0.4     # optional: kinect.py audio <other-mic> fallback path
 soundfile>=0.12      # optional: WAV writing for audio capture
+faster-whisper>=1.0  # STT for kinect_hear speech transcription

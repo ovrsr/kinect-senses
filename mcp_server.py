@@ -33,6 +33,7 @@ import kinect
 import kinect_audio
 import kinect_doa
 import kinect_fusion
+import kinect_stt
 
 mcp = FastMCP("kinect-senses")
 
@@ -113,7 +114,8 @@ def kinect_pointcloud() -> list:
 
 
 @mcp.tool(description="Read the room's audio via the 4-mic array for `seconds` "
-          "(1-15). Returns a spectrogram image + per-channel levels (dBFS). "
+          "(1-15). Returns a spectrogram image, per-channel levels (dBFS), and "
+          "a speech transcript (via faster-whisper STT). "
           "PRIVACY: this records the microphone.")
 def kinect_hear(seconds: float = 5.0) -> list:
     seconds = float(max(1.0, min(15.0, seconds)))
@@ -128,6 +130,17 @@ def kinect_hear(seconds: float = 5.0) -> list:
             info = {"seconds": round(audio.shape[0] / kinect_audio.RATE, 2),
                     "channels": int(audio.shape[1]), "samplerate": kinect_audio.RATE,
                     "per_channel_dbfs": [round(20 * np.log10(r + 1e-12), 1) for r in rms]}
+            # Speech-to-text transcription
+            try:
+                stt = kinect_stt.transcribe_audio(audio, kinect_audio.RATE)
+                info["transcript"] = stt["transcript"]
+                info["stt_language"] = stt["language"]
+                info["stt_language_probability"] = stt["language_probability"]
+                info["stt_segments"] = stt["segments"]
+                info["stt_processing_s"] = stt["processing_s"]
+            except Exception as stt_err:
+                info["transcript"] = None
+                info["stt_error"] = str(stt_err)
             return [_png(spec), _json(info)]
         except Exception as e:
             return [_err("kinect_hear", e)]
